@@ -1,29 +1,32 @@
 $folder = "C:\Users\hch\OneDrive\Vejrkamera snapshots"
-$filter = "Weathercam_snapshotScene.png"
+$targetFile = "Weathercam_snapshotScene.png"
+$fullPath = Join-Path $folder $targetFile
 
 Set-Location $folder
 
-# Ryd op i tidligere overvågninger i baggrunden
-Get-EventSubscriber -ErrorAction SilentlyContinue | Unregister-Event
+$lastWrite = (Get-Item $fullPath -ErrorAction SilentlyContinue).LastWriteTime
 
-$watcher = New-Object System.IO.FileSystemWatcher
-$watcher.Path = $folder
-$watcher.Filter = $filter
-$watcher.EnableRaisingEvents = $true
+Write-Host "Overvåger $targetFile via direkte tjek..." -ForegroundColor Cyan
 
-$action = {
-    param($sender, $e)
-    Start-Sleep -Seconds 3
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Billede opdateret! Uploader til GitHub..." -ForegroundColor Yellow
+while ($true) {
+    if (Test-Path $fullPath) {
+        $currentWrite = (Get-Item $fullPath).LastWriteTime
+        
+        if ($null -ne $lastWrite -and $currentWrite -gt $lastWrite) {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Billede opdateret! Henter seneste GitHub-status og uploader..." -ForegroundColor Yellow
+            
+            Start-Sleep -Seconds 2
+            git add Weathercam_snapshotScene.png
+            git commit -m "Auto update weathercam"
+            git pull origin main --rebase
+            git push origin main
+            
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Upload fuldført til GitHub!" -ForegroundColor Green
+            $lastWrite = $currentWrite
+        } elseif ($null -eq $lastWrite) {
+            $lastWrite = $currentWrite
+        }
+    }
     
-    git add Weathercam_snapshotScene.png
-    git commit -m "Auto update weathercam"
-    git push origin main
-    
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Upload fuldført!" -ForegroundColor Green
+    Start-Sleep -Seconds 5
 }
-
-Register-ObjectEvent $watcher "Changed" -Action $action
-
-Write-Host "Overvåger KUN $filter. Venter på næste OBS snapshot..." -ForegroundColor Cyan
-while ($true) { Start-Sleep -Seconds 5 }
