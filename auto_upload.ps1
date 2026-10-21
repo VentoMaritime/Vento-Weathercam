@@ -1,28 +1,29 @@
 $folder = "C:\Users\hch\OneDrive\Vejrkamera snapshots"
+$filter = "Weathercam_snapshotScene.png"
+
 Set-Location $folder
+
+# Ryd op i tidligere overvågninger i baggrunden
+Get-EventSubscriber -ErrorAction SilentlyContinue | Unregister-Event
 
 $watcher = New-Object System.IO.FileSystemWatcher
 $watcher.Path = $folder
-$watcher.Filter = "*.*"
-$watcher.IncludeSubdirectories = $false
+$watcher.Filter = $filter
 $watcher.EnableRaisingEvents = $true
 
 $action = {
     param($sender, $e)
-    $filename = $e.Name
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Registrerede ændring på fil: $filename" -ForegroundColor Yellow
+    Start-Sleep -Seconds 3
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Billede opdateret! Uploader til GitHub..." -ForegroundColor Yellow
     
-    Start-Sleep -Seconds 2
-    git add .
+    git add Weathercam_snapshotScene.png
     git commit -m "Auto update weathercam"
     git push origin main
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Push udført for $filename!" -ForegroundColor Green
+    
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Upload fuldført!" -ForegroundColor Green
 }
 
-# Ryd op i gamle overvågninger før opstart
-Get-EventSubscriber -ErrorAction SilentlyContinue | Unregister-Event
 Register-ObjectEvent $watcher "Changed" -Action $action
-Register-ObjectEvent $watcher "Created" -Action $action
 
-Write-Host "Overvågning NULSTILLET og kører på ALLERENDE filer i mappen..." -ForegroundColor Cyan
-while ($true) { Start-Sleep -Seconds 2 }
+Write-Host "Overvåger KUN $filter. Venter på næste OBS snapshot..." -ForegroundColor Cyan
+while ($true) { Start-Sleep -Seconds 5 }
